@@ -3,19 +3,20 @@ module GameData
   COLORS = ['b','g','o','p','r','y']
   COLORS_FULL = %w[blue green orange pink red yellow]
   NO_COLORS = 4
-  NO_ROUNDS = 4
+  NO_ROUNDS = 8
 end
 
 
 class Board
   include GameData
+  attr_accessor :rounds
 
   def initialize
     @rounds = { pick: Array.new(NO_ROUNDS, ['....']), 
                 keys: Array.new(NO_ROUNDS, ['....']) }
   end
 
-  def update_code(code)
+  def import_code(code)
     @code = code
   end
 
@@ -34,43 +35,41 @@ class Board
   end
 
   def compare(pick)
-    comparison = { keys: [], pick: [], code: [] }
+    comparison = { keys: [], pos: [], col: [] }
     check_positions(pick, comparison)
     check_colors(pick, comparison)
     return comparison[:keys]
   end
   
   def check_positions(pick, comp)
-    NO_COLORS.times do |i|
-      if pick[i] != @code[i]
-        comp[:pick] << pick[i]
-        comp[:code] << @code[i]
-      else
+    pick.each_index do |i|
+      if pick[i] == @code[i]
         comp[:keys] << 'O'
+        comp[:pos] << i
       end
     end
   end
       
   def check_colors(pick, comp)
-    loop do
-      comp[:pick].each_index do |i|
-        comp[:code].each_index do |j|
-          if comp[:pick][i] == comp[:code][j]
-            comp[:keys] << 'o'
-            comp[:pick].delete_at(i)
-            comp[:code].delete_at(j)
-          end
+    pick.each_index do |i|
+      next if comp[:pos].include?(i)
+      @code.each_index do |j|
+        next if comp[:col].include?(j) || comp[:pos].include?(j)
+        if pick[i] == @code[j]
+          comp[:keys] << 'o'
+          comp[:col] << j
         end
       end
-      break if comp[:pick] & comp[:code] == []
     end
   end
 
   def show(counter)
     puts
-    won?(counter) || lost?(counter) ? 
-      @code.each { |i| print i } : 
-      NO_COLORS.times { print 'X' }
+    # for testing
+    @code.each { |i| print i }
+    # won?(counter) || lost?(counter) ? 
+    #   @code.each { |i| print i } : 
+    #   NO_COLORS.times { print 'X' }
     puts
     puts '----'
     (NO_ROUNDS-1).downto(0) do |i|
@@ -100,6 +99,7 @@ class Game
     until @board.lost?(@counter) || @board.won?(@counter)
       @player.pick(@counter)
       @board.show(@counter)
+      # FIXME
       # puts 'You won.' if @board.won?(@counter)
       # puts 'You lost.' if @board.lost?(@counter)
       @counter += 1
@@ -119,7 +119,7 @@ class Game
           @player = Computer.new(@board)
         break
       end
-    puts "Invalid input. Type 'player' or 'computer'."
+    puts "Invalid input. Type 'human' or 'computer'."
     end
   end
 
@@ -149,7 +149,7 @@ class Human
 
   def select_code
     NO_COLORS.times { @code << COLORS[rand(6)] }
-    @board.update_code(@code)
+    @board.import_code(@code)
   end
 
   def pick(counter)
@@ -189,7 +189,7 @@ class Computer
     loop do
       @code = gets.chomp.split('')
       if valid?(@code)
-        @board.update_code(@code)
+        @board.import_code(@code)
         break
       end
       example = []
