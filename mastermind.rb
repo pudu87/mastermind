@@ -3,20 +3,20 @@ module GameData
   COLORS = ['b','g','o','p','r','y']
   COLORS_FULL = %w[blue green orange pink red yellow]
   NO_COLORS = 4
-  NO_ROUNDS = 12
+  NO_ROUNDS = 4
 end
+
 
 class Board
   include GameData
 
   def initialize
-    @code = []
     @rounds = { pick: Array.new(NO_ROUNDS, ['....']), 
                 keys: Array.new(NO_ROUNDS, ['....']) }
   end
 
-  def select_code
-    NO_COLORS.times { @code << COLORS[rand(6)] }
+  def update_code(code)
+    @code = code
   end
 
   def lost?(counter)
@@ -24,7 +24,7 @@ class Board
   end
 
   def won?(counter)
-    @rounds[:pick][counter] == @code
+    @rounds[:pick][counter-1] == @code
   end
 
   def insert(pick, counter)
@@ -90,37 +90,77 @@ class Game
   def initialize
     @board = Board.new
     @counter = 0
+    @player = 0
   end
 
-  def start
-    intro
-    @board.select_code
+  def game
+    select_game_mode
+    @player.intro
+    @player.select_code
     until @board.lost?(@counter) || @board.won?(@counter)
-      pick
+      @player.pick(@counter)
       @board.show(@counter)
-      puts 'You won.' if @board.won?(@counter)
-      puts 'You lost.' if @board.lost?(@counter)
+      # puts 'You won.' if @board.won?(@counter)
+      # puts 'You lost.' if @board.lost?(@counter)
       @counter += 1
     end
   end
 
+  def select_game_mode
+    puts 'Welcome to Mastermind.'
+    puts
+    puts "Type 'human' if you want to guess the secret code."
+    puts "Type 'computer' if you want the computer to do it."
+    loop do
+      mode = gets.chomp
+      if valid_game_mode?(mode)
+        mode == 'human' ? 
+          @player = Human.new(@board) : 
+          @player = Computer.new(@board)
+        break
+      end
+    puts "Invalid input. Type 'player' or 'computer'."
+    end
+  end
+
+  def valid_game_mode?(mode)
+    mode == 'human' || mode == 'computer'
+  end
+end
+
+
+class Human
+  include GameData
+
+  def initialize(board)
+    @code = []
+    @board = board
+  end
+
   def intro
-    puts; puts 'Welcome to Mastermind.'
+    puts
     puts "Please pick #{NO_COLORS} colors. Choose between:"
     (COLORS.size).times { |i| print "#{COLORS_FULL[i]}(#{COLORS[i]}) " }
     puts
-    puts; puts "O= Correct color in correct position; o= Correct color."
+    puts
+    puts "O= Correct color in correct position; o= Correct color."
     puts
   end
 
-  def pick
+  def select_code
+    NO_COLORS.times { @code << COLORS[rand(6)] }
+    @board.update_code(@code)
+  end
+
+  def pick(counter)
     loop do
       pick = gets.chomp.split('')
       if valid?(pick)
-        @board.insert(pick, @counter)
+        @board.insert(pick, counter)
         break
       end
-      example = NO_COLORS.times { @code << COLORS[rand(6)] }
+      example = []
+      NO_COLORS.times { example << COLORS[rand(6)] }
       puts "Invalid input. Pick #{NO_COLORS} colors, e.g.: '#{example}'."
     end
   end
@@ -131,5 +171,44 @@ class Game
 end
 
 
+class Computer
+  include GameData
+
+  def initialize(board)
+    @board = board
+  end
+
+  def intro
+    puts
+  end
+
+  def select_code
+    puts "Please pick #{NO_COLORS} colors. Choose between:"
+    (COLORS.size).times { |i| print "#{COLORS_FULL[i]}(#{COLORS[i]}) " }
+    puts
+    loop do
+      @code = gets.chomp.split('')
+      if valid?(@code)
+        @board.update_code(@code)
+        break
+      end
+      example = []
+      NO_COLORS.times { example << COLORS[rand(6)] }
+      puts "Invalid input. Pick #{NO_COLORS} colors, e.g.: '#{example}'."
+    end
+  end
+
+  def valid?(code)
+    @code.size == NO_COLORS && @code.all? { |i| COLORS.include?(i) }
+  end
+
+  def pick(counter)
+    pick = []
+    NO_COLORS.times { pick << COLORS[rand(6)] }
+    @board.insert(pick, counter)
+  end
+end
+
+
 test = Game.new
-test.start
+test.game
