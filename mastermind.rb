@@ -4,84 +4,17 @@ module GameData
   COLORS_FULL = %w[blue green orange pink red yellow]
   NO_COLORS = 4
   NO_ROUNDS = 12
-end
-
-
-class Board
-  include GameData
-  attr_accessor :rounds
-
-  def initialize
-    @rounds = { pick: Array.new(NO_ROUNDS, ['....']), 
-                keys: Array.new(NO_ROUNDS, ['....']),
-                pos: Array.new(NO_ROUNDS, []),
-                col: Array.new(NO_ROUNDS, []) 
-              }
-  end
-
-  def import_code(code)
-    @code = code
-  end
-
-  def lost?(counter)
-    counter == NO_ROUNDS
-  end
-
-  def won?(counter)
-    @rounds[:pick][counter-1] == @code
-  end
-
-  def insert(pick, counter)
-    comparison = compare(pick)
-    @rounds[:pick][counter] = pick
-    @rounds[:keys][counter] = comparison[:keys]
-    @rounds[:pos][counter] = comparison[:pos]
-    @rounds[:col][counter] = comparison[:col]
-  end
-
-  def compare(pick)
-    comparison = { keys: [], pos: [], col: [] }
-    check_positions(pick, comparison)
-    check_colors(pick, comparison)
-    return comparison
-  end
   
-  def check_positions(pick, comp)
-    pick.each_index do |i|
-      if pick[i] == @code[i]
-        comp[:keys] << 'O'
-        comp[:pos] << i
-      end
-    end
-  end
-      
-  def check_colors(pick, comp)
-    pick.each_index do |i|
-      next if comp[:pos].include?(i)
-      @code.each_index do |j|
-        next if comp[:col].include?(j) || comp[:pos].include?(j)
-        if pick[i] == @code[j]
-          comp[:keys] << 'o'
-          comp[:col] << j
-        end
-      end
-    end
+  def color_intro
+    puts "Please pick #{NO_COLORS} colors. Choose between:"
+    (COLORS.size).times { |i| print "#{COLORS_FULL[i]}(#{COLORS[i]}) " }
+    puts
   end
 
-  def show(counter)
-    puts
-    won?(counter) || lost?(counter) ? 
-      @code.each { |i| print i } : 
-      NO_COLORS.times { print 'X' }
-    puts
-    puts '----'
-    (NO_ROUNDS-1).downto(0) do |i|
-      @rounds[:pick][i].each { |j| print j }
-      print ' '
-      @rounds[:keys][i].each { |j| print j }
-      puts
-    end
-    puts
+  def color_example
+    example = []
+    NO_COLORS.times { example << COLORS[rand(6)] }
+    puts "Invalid input. Pick #{NO_COLORS} colors, e.g.: '#{example}'."
   end
 end
 
@@ -92,7 +25,6 @@ class Game
   def initialize
     @board = Board.new
     @counter = 0
-    @player = 0
   end
 
   def game
@@ -110,25 +42,21 @@ class Game
   
   def intro
     puts 'Welcome to Mastermind.'
-    puts
+    puts '---------------------'
     puts "Type 'human' if you want to guess the secret code."
     puts "Type 'computer' if you want the computer to do it."
   end
 
   def select_game_mode
-    loop do
+    @mode = gets.chomp
+    until valid_mode?(@mode)
       @mode = gets.chomp
-      if valid_game_mode?(@mode)
-        @mode == 'human' ? 
-          @player = Human.new(@board) : 
-          @player = Computer.new(@board)
-        break
-      end
-    puts "Invalid input. Type 'human' or 'computer'."
+      puts "Invalid input. Type 'human' or 'computer'."
     end
+    @mode == 'human' ? @player = Human.new(@board) : @player = Computer.new(@board)
   end
 
-  def valid_game_mode?(mode)
+  def valid_mode?(mode)
     mode == 'human' || mode == 'computer'
   end
 
@@ -148,12 +76,8 @@ class Human
 
   def intro
     puts
-    puts "Please pick #{NO_COLORS} colors. Choose between:"
-    (COLORS.size).times { |i| print "#{COLORS_FULL[i]}(#{COLORS[i]}) " }
-    puts
-    puts
+    color_intro
     puts "O= Correct color in correct position; o= Correct color."
-    puts
   end
 
   def select_code
@@ -162,16 +86,12 @@ class Human
   end
 
   def pick(counter)
-    loop do
+    pick = gets.chomp.split('')
+    until valid?(pick)
       pick = gets.chomp.split('')
-      if valid?(pick)
-        @board.insert(pick, counter)
-        break
-      end
-      example = []
-      NO_COLORS.times { example << COLORS[rand(6)] }
-      puts "Invalid input. Pick #{NO_COLORS} colors, e.g.: '#{example}'."
+      color_example
     end
+    @board.insert(pick, counter)
   end
 
   def valid?(pick)
@@ -187,24 +107,16 @@ class Computer
     @board = board
   end
 
-  def intro
-    puts
-  end
+  def intro; end
 
   def select_code
-    puts "Please pick #{NO_COLORS} colors. Choose between:"
-    (COLORS.size).times { |i| print "#{COLORS_FULL[i]}(#{COLORS[i]}) " }
-    puts
-    loop do
+    color_intro
+    @code = gets.chomp.split('')
+    until valid?(@code)
       @code = gets.chomp.split('')
-      if valid?(@code)
-        @board.import_code(@code)
-        break
-      end
-      example = []
-      NO_COLORS.times { example << COLORS[rand(6)] }
-      puts "Invalid input. Pick #{NO_COLORS} colors, e.g.: '#{example}'."
+      color_example
     end
+    @board.import_code(@code)
   end
 
   def valid?(code)
@@ -215,15 +127,96 @@ class Computer
     pick = []
     rounds = @board.rounds
     NO_COLORS.times { pick << COLORS[rand(6)] }
-    if counter > 0
-      rounds[:pos][counter-1].each { |i| pick[i] = @code[i] }
-      samples = []
-      rounds[:col][counter-1].each do |i|
-        samples << ((0..NO_COLORS-1).to_a - rounds[:pos][counter-1] - samples).sample
-        pick[samples[-1]] = @code[i]
+    place_pos(counter, pick, rounds)
+    place_col(counter, pick, rounds)
+    @board.insert(pick, counter)
+  end
+
+  def place_pos(counter, pick, rounds)
+    rounds[:pos][counter-1].each { |i| pick[i] = @code[i] }
+  end
+
+  def place_col(counter, pick, rounds)
+    samples = []
+    rounds[:col][counter-1].each do |i|
+      samples << ((0..NO_COLORS-1).to_a - rounds[:pos][counter-1] - samples).sample
+      pick[samples[-1]] = @code[i]
+    end
+  end
+end
+
+
+class Board
+  include GameData
+  attr_accessor :rounds
+
+  def initialize
+    @rounds = { pick: Array.new(NO_ROUNDS, ['....']), 
+                keys: Array.new(NO_ROUNDS, []),
+                pos: Array.new(NO_ROUNDS, []),
+                col: Array.new(NO_ROUNDS, []) 
+              }
+  end
+
+  def import_code(code)
+    @code = code
+  end
+
+  def lost?(counter)
+    counter == NO_ROUNDS
+  end
+
+  def won?(counter)
+    @rounds[:pick][counter-1] == @code
+  end
+
+  def insert(pick, counter)
+    compare = { keys: [], pos: [], col: [] }
+    check_positions(pick, compare)
+    check_colors(pick, compare)
+    @rounds[:pick][counter], @rounds[:keys][counter] = pick, compare[:keys]
+    @rounds[:pos][counter], @rounds[:col][counter] = compare[:pos], compare[:col]
+  end
+  
+  def check_positions(pick, comp)
+    pick.each_index do |i|
+      if pick[i] == @code[i]
+        comp[:keys] << 'O'
+        comp[:pos] << i
       end
     end
-    @board.insert(pick, counter)
+  end
+      
+  def check_colors(pick, comp)
+    col_pick = []
+    pick.each_index do |i|
+      next if comp[:pos].include?(i)
+      @code.each_index do |j|
+        next if comp[:col].include?(j) || 
+          comp[:pos].include?(j) || col_pick.include?(i)
+        if pick[i] == @code[j]
+          comp[:keys] << 'o'
+          comp[:col] << j
+          col_pick << i
+        end
+      end
+    end
+  end
+
+  def show(counter)
+    puts
+    won?(counter) || lost?(counter) ? 
+      @code.each { |i| print i } : 
+      NO_COLORS.times { print 'X' }
+    puts
+    puts '----'
+    (NO_ROUNDS-1).downto(0) do |i|
+      @rounds[:pick][i].each { |j| print j }
+      print ' '
+      @rounds[:keys][i].each { |j| print j }
+      puts
+    end
+    puts
   end
 end
 
