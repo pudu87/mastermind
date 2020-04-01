@@ -3,7 +3,7 @@ module GameData
   COLORS = ['b','g','o','p','r','y']
   COLORS_FULL = %w[blue green orange pink red yellow]
   NO_COLORS = 4
-  NO_ROUNDS = 8
+  NO_ROUNDS = 12
 end
 
 
@@ -13,7 +13,10 @@ class Board
 
   def initialize
     @rounds = { pick: Array.new(NO_ROUNDS, ['....']), 
-                keys: Array.new(NO_ROUNDS, ['....']) }
+                keys: Array.new(NO_ROUNDS, ['....']),
+                pos: Array.new(NO_ROUNDS, []),
+                col: Array.new(NO_ROUNDS, []) 
+              }
   end
 
   def import_code(code)
@@ -29,16 +32,18 @@ class Board
   end
 
   def insert(pick, counter)
-    keys = compare(pick)
+    comparison = compare(pick)
     @rounds[:pick][counter] = pick
-    @rounds[:keys][counter] = keys
+    @rounds[:keys][counter] = comparison[:keys]
+    @rounds[:pos][counter] = comparison[:pos]
+    @rounds[:col][counter] = comparison[:col]
   end
 
   def compare(pick)
     comparison = { keys: [], pos: [], col: [] }
     check_positions(pick, comparison)
     check_colors(pick, comparison)
-    return comparison[:keys]
+    return comparison
   end
   
   def check_positions(pick, comp)
@@ -65,11 +70,9 @@ class Board
 
   def show(counter)
     puts
-    # for testing
-    @code.each { |i| print i }
-    # won?(counter) || lost?(counter) ? 
-    #   @code.each { |i| print i } : 
-    #   NO_COLORS.times { print 'X' }
+    won?(counter) || lost?(counter) ? 
+      @code.each { |i| print i } : 
+      NO_COLORS.times { print 'X' }
     puts
     puts '----'
     (NO_ROUNDS-1).downto(0) do |i|
@@ -93,28 +96,30 @@ class Game
   end
 
   def game
+    intro
     select_game_mode
     @player.intro
     @player.select_code
     until @board.lost?(@counter) || @board.won?(@counter)
       @player.pick(@counter)
       @board.show(@counter)
-      # FIXME
-      # puts 'You won.' if @board.won?(@counter)
-      # puts 'You lost.' if @board.lost?(@counter)
       @counter += 1
     end
+    outro
   end
-
-  def select_game_mode
+  
+  def intro
     puts 'Welcome to Mastermind.'
     puts
     puts "Type 'human' if you want to guess the secret code."
     puts "Type 'computer' if you want the computer to do it."
+  end
+
+  def select_game_mode
     loop do
-      mode = gets.chomp
-      if valid_game_mode?(mode)
-        mode == 'human' ? 
+      @mode = gets.chomp
+      if valid_game_mode?(@mode)
+        @mode == 'human' ? 
           @player = Human.new(@board) : 
           @player = Computer.new(@board)
         break
@@ -125,6 +130,10 @@ class Game
 
   def valid_game_mode?(mode)
     mode == 'human' || mode == 'computer'
+  end
+
+  def outro
+    puts @board.won?(@counter) == (@mode == 'human') ? 'You won.' : 'Computer won.'
   end
 end
 
@@ -204,7 +213,16 @@ class Computer
 
   def pick(counter)
     pick = []
+    rounds = @board.rounds
     NO_COLORS.times { pick << COLORS[rand(6)] }
+    if counter > 0
+      rounds[:pos][counter-1].each { |i| pick[i] = @code[i] }
+      samples = []
+      rounds[:col][counter-1].each do |i|
+        samples << ((0..NO_COLORS-1).to_a - rounds[:pos][counter-1] - samples).sample
+        pick[samples[-1]] = @code[i]
+      end
+    end
     @board.insert(pick, counter)
   end
 end
