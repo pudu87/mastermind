@@ -39,6 +39,8 @@ class Game
     end
     outro
   end
+
+  private
   
   def intro
     puts 'Welcome to Mastermind.'
@@ -94,6 +96,8 @@ class Human
     @board.insert(pick, counter)
   end
 
+  private
+
   def valid?(pick)
     pick.size == NO_COLORS && pick.all? { |i| COLORS.include?(i) }
   end
@@ -119,10 +123,6 @@ class Computer
     @board.import_code(@code)
   end
 
-  def valid?(code)
-    @code.size == NO_COLORS && @code.all? { |i| COLORS.include?(i) }
-  end
-
   def pick(counter)
     pick = []
     rounds = @board.rounds
@@ -130,6 +130,12 @@ class Computer
     place_pos(counter, pick, rounds)
     place_col(counter, pick, rounds)
     @board.insert(pick, counter)
+  end
+
+  private
+
+  def valid?(code)
+    @code.size == NO_COLORS && @code.all? { |i| COLORS.include?(i) }
   end
 
   def place_pos(counter, pick, rounds)
@@ -177,6 +183,24 @@ class Board
     @rounds[:pick][counter], @rounds[:keys][counter] = pick, compare[:keys]
     @rounds[:pos][counter], @rounds[:col][counter] = compare[:pos], compare[:col]
   end
+
+  def show(counter)
+    puts
+    won?(counter) || lost?(counter) ? 
+      @code.each { |i| print i } : 
+      NO_COLORS.times { print 'X' }
+    puts
+    puts '----'
+    (NO_ROUNDS-1).downto(0) do |i|
+      @rounds[:pick][i].each { |j| print j }
+      print ' '
+      @rounds[:keys][i].each { |j| print j }
+      puts
+    end
+    puts
+  end
+
+  private
   
   def check_positions(pick, comp)
     pick.each_index do |i|
@@ -201,22 +225,6 @@ class Board
         end
       end
     end
-  end
-
-  def show(counter)
-    puts
-    won?(counter) || lost?(counter) ? 
-      @code.each { |i| print i } : 
-      NO_COLORS.times { print 'X' }
-    puts
-    puts '----'
-    (NO_ROUNDS-1).downto(0) do |i|
-      @rounds[:pick][i].each { |j| print j }
-      print ' '
-      @rounds[:keys][i].each { |j| print j }
-      puts
-    end
-    puts
   end
 end
 
